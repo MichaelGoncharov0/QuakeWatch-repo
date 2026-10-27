@@ -16,19 +16,28 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install pylint
         run: |
           python -m pip install --upgrade pip
           pip install pylint
 
-      - name: Run pylint on Python files
+      - name: Run pylint on app Python files
+        shell: bash
         run: |
-          python -m pylint --disable=import-error $(find . -type f -name "*.py" \
+          mapfile -d '' PY_FILES < <(find "$GITHUB_WORKSPACE/QuakeWatch-app" -type f -name "*.py" \
             ! -path "*/.git/*" \
-            ! -path "*/venv/*")
+            ! -path "*/venv/*" \
+            -print0 || true)
+
+          if [ ${#PY_FILES[@]} -eq 0 ]; then
+            echo "No Python files found in QuakeWatch-app"
+            exit 1
+          fi
+
+          python -m pylint --disable=import-error "${PY_FILES[@]}"
 
       - name: Build Docker image
         run: |
-          docker build -f Phase3/quakewatch-chart/Dockerfile -t quakewatch:ci .
+          docker build -f QuakeWatch-app/Dockerfile -t quakewatch:ci QuakeWatch-app

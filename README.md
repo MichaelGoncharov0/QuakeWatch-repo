@@ -1,191 +1,102 @@
-# QuakeWatch Helm Chart
+# QuakeWatch
 
-This chart deploys the QuakeWatch Flask application to Kubernetes.
+This repository is organized into two main parts:
 
-It includes the main Kubernetes resources used in the earlier phases of the project:
-- Deployment
-- Service
-- ConfigMap
-- Secret
-- PersistentVolume and PersistentVolumeClaim
-- CronJob
-- HorizontalPodAutoscaler
-- PodDisruptionBudget
-- PriorityClass
+- `QuakeWatch-app/` — the Flask application source code, Python dependencies, templates, static assets, and its Dockerfile.
+- `charts/quakewatch-chart/` — the Helm chart used to deploy the app to Kubernetes.
+- `.github/workflows/quakewatch-ci.yaml` — CI pipeline that runs `pylint` and builds the application Docker image.
 
-## Prerequisites
+This separation keeps the application code independent from the deployment configuration and makes the project easier to maintain and scale.
 
-Before you begin, make sure you have:
-- Docker installed
-- Helm 3 installed
-- kubectl installed and configured for your cluster
-- a working Kubernetes cluster (Docker Desktop, Kind, Minikube, or a cloud cluster)
+## Repository structure
 
-## Quick start
-
-Create a folder to keep your Helm work organized:
-
-```bash
-mkdir -p ~/quakewatch-helm
-cd ~/quakewatch-helm
+```text
+quakewatch-repo/
+├── .github/
+│   └── workflows/
+│       └── quakewatch-ci.yaml
+├── QuakeWatch-app/
+│   ├── app.py
+│   ├── dashboard.py
+│   ├── utils.py
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   ├── static/
+│   └── templates/
+├── charts/
+│   └── quakewatch-chart/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       ├── .helmignore
+│       └── templates/
+├── README.md
+└── .gitignore
 ```
 
-Create the namespace:
+## Application setup
+
+Go to the app folder:
 
 ```bash
-kubectl create namespace quakewatch --dry-run=client -o yaml | kubectl apply -f -
-```
-
-Check current namesapce with:
-
-```bash
-kubectl config view --minify| grep namespace:
-```
-
-Pull the chart from Docker Hub and unpack it locally:
-
-```bash
-helm pull oci://registry-1.docker.io/michaelgoncharov0/quakewatch-repo --version 0.1.0 --untar
-```
-
-Install it:
-
-```bash
-helm upgrade -i quakewatch-chart ./quakewatch-chart-0.1.0 \
-  --namespace quakewatch
-```
-
-You can also install it directly from the registry without downloading it first:
-
-```bash
-helm upgrade -i quakewatch-chart oci://registry-1.docker.io/michaelgoncharov0/quakewatch-repo \
-  --version 0.1.0 \
-  --namespace quakewatch
-```
-
-## Check the deployment
-
-```bash
-kubectl get pods -n quakewatch
-kubectl get svc -n quakewatch
-kubectl get pvc -n quakewatch
-kubectl get hpa -n quakewatch
-kubectl get cronjob -n quakewatch
-```
-
-## Access the app in the browser
-
-The service is configured as a NodePort, but on local clusters like Docker Desktop, the app is usually easiest to reach through port forwarding.
-
-Run this in a terminal:
-
-```bash
-kubectl port-forward svc/quakewatch-service 30080:80 -n quakewatch
+cd QuakeWatch-app
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
 ```
 
 Then open:
 
 ```text
-http://localhost:30080
+http://localhost:5000
 ```
 
-This forwards traffic from your local machine to the Kubernetes service, so your browser can reach the application without needing to know the cluster node IP.
+## Docker build
 
-## Health check
+Build the container from the application directory:
 
 ```bash
-curl http://localhost:30080/health
+cd QuakeWatch-app
+docker build -t quakewatch:latest .
 ```
 
-## Local chart install
-
-If you already have the chart source locally, you can also install it directly from the folder:
+Run it locally:
 
 ```bash
-helm upgrade --install quakewatch-chart . --namespace quakewatch --create-namespace
+docker run -p 5000:5000 quakewatch:latest
 ```
 
-## Versioning in Helm
+## CI pipeline
 
-Helm keeps track of versions for both the chart and the application.
+The workflow runs on every push to non-`main` branches and performs:
 
-The chart version is defined in `Chart.yaml`:
+- Python environment setup
+- `pylint` linting for all Python files in `QuakeWatch-app`
+- Docker image build for the application
 
-```yaml
-version: 0.1.0
+The workflow is defined in:
+
+```text
+.github/workflows/quakewatch-ci.yaml
 ```
 
-The app version is also defined there:
+## Helm chart deployment
 
-```yaml
-appVersion: "1.16.0"
-```
-
-When you make changes to the chart itself, bump the chart version. When you release a new app image, bump the app version. This helps with rollback and release tracking.
-
-Example:
+From the repo root, validate the chart:
 
 ```bash
-helm history quakewatch-chart -n quakewatch
-helm rollback quakewatch-chart 1 -n quakewatch
+helm lint charts/quakewatch-chart
+helm template quakewatch charts/quakewatch-chart
 ```
 
-## Useful commands
-
-Render templates without installing:
+Install it locally:
 
 ```bash
-helm template quakewatch-chart .
-```
-
-Check release history:
-
-```bash
-helm history quakewatch-chart -n quakewatch
-```
-
-Uninstall the release:
-
-```bash
-helm uninstall quakewatch-chart -n quakewatch
+helm upgrade --install quakewatch charts/quakewatch-chart --namespace quakewatch --create-namespace
 ```
 
 ## Notes
 
-- The app listens on port `5000` inside the container.
-- The Service exposes port `80` and NodePort `30080`.
-- The `hostPath` storage is intended for local testing and demos.
-- For production, prefer a proper storage class or cloud-managed storage.
-
-## Troubleshooting
-
-### The app is not reachable from the browser
-Check the service and endpoints:
-
-```bash
-kubectl get svc -n quakewatch
-kubectl get endpoints -n quakewatch
-```
-
-If needed, port-forward again:
-
-```bash
-kubectl port-forward svc/quakewatch-service 30080:80 -n quakewatch
-```
-
-### Pods are not starting
-Check the logs:
-
-```bash
-kubectl get pods -n quakewatch
-kubectl logs -n quakewatch deploy/quakewatch
-kubectl describe pod -n quakewatch <pod-name>
-```
-
-### Helm install fails
-Validate the chart before deploying:
-
-```bash
-helm template quakewatch-chart .
-helm lint .
-```
+- Keep application source and deployment manifests separate.
+- The app image is built from `QuakeWatch-app/Dockerfile`.
+- The chart references the container image configured in `charts/quakewatch-chart/values.yaml`.

@@ -6,12 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install runtime dependencies from the application source
-COPY Phase1/QuakeWatch/requirements.txt ./requirements.txt
+# Install runtime dependencies
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source code
-COPY Phase1/QuakeWatch/ .
+COPY . .
 
 # Ensure logs directory exists
 RUN mkdir -p /app/logs
