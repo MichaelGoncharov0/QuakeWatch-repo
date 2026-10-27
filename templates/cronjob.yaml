@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.cronJob.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  schedule: {{ .Values.cronJob.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: health-check
+              image: "{{ .Values.cronJob.image }}:{{ .Values.cronJob.tag }}"
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  curl -fsS http://{{ .Values.cronJob.serviceName }}.{{ .Values.namespace }}.svc.cluster.local/health || exit 1
