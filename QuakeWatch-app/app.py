@@ -2,7 +2,7 @@
 
 import logging
 import os
-from logging.handlers import RotatingFileHandler
+import sys
 
 import matplotlib
 from flask import Flask, request
@@ -14,29 +14,27 @@ from utils import timestamp_to_str  # Import our custom filter
 matplotlib.use('Agg')
 
 
+def _configure_logging(flask_app):
+    """Send application and access logs to stdout so `docker logs`/`kubectl logs` see them."""
+    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+    flask_app.logger.handlers = [handler]
+    flask_app.logger.setLevel(log_level)
+
+    usage_logger = logging.getLogger('usage')
+    usage_logger.handlers = [handler]
+    usage_logger.setLevel(log_level)
+    usage_logger.propagate = False
+    return usage_logger
+
+
 def create_app():
     """Create and configure the QuakeWatch Flask application."""
     flask_app = Flask(__name__)
-
-    # -------------------------
-    # Logging Configuration
-    # -------------------------
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-
-    error_handler = RotatingFileHandler('logs/error.log', maxBytes=1000000, backupCount=3)
-    error_handler.setLevel(logging.ERROR)
-    error_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    error_handler.setFormatter(error_formatter)
-    flask_app.logger.addHandler(error_handler)
-
-    usage_handler = RotatingFileHandler('logs/access.log', maxBytes=1000000, backupCount=3)
-    usage_handler.setLevel(logging.INFO)
-    usage_formatter = logging.Formatter('%(asctime)s - %(message)s')
-    usage_handler.setFormatter(usage_formatter)
-    usage_logger = logging.getLogger('usage')
-    usage_logger.addHandler(usage_handler)
-    usage_logger.setLevel(logging.INFO)
+    usage_logger = _configure_logging(flask_app)
 
     @flask_app.before_request
     def log_request_info():
@@ -52,5 +50,10 @@ def create_app():
 
 
 if __name__ == '__main__':
+    # Local development server only; the container runs gunicorn instead.
     app = create_app()
-    app.run(host='0.0.0.0', debug=True)
+    app.run(
+        host='0.0.0.0',
+        port=int(os.environ.get('PORT', '5000')),
+        debug=os.environ.get('FLASK_DEBUG', '0') == '1',
+    )

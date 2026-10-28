@@ -1,6 +1,7 @@
 """Utility helpers for QuakeWatch earthquake data queries and graph generation."""
 
 import io
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -16,6 +17,7 @@ COUNTRIES = {
 }
 
 EARTHQUAKE_API_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
+API_TIMEOUT_SECONDS = int(os.environ.get("API_TIMEOUT_SECONDS", "20"))
 
 
 def _build_query_params(start_time, latitude, longitude, radius):
@@ -58,7 +60,7 @@ def generate_graph(days, lat, lon, radius, title_suffix=""):
     start_time = (datetime.utcnow() - timedelta(days=days)
                   ).strftime("%Y-%m-%d")
     params = _build_query_params(start_time, lat, lon, radius)
-    response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=20)
+    response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=API_TIMEOUT_SECONDS)
 
     plt.figure(figsize=(10, 5))
 
@@ -107,7 +109,7 @@ def get_top_earthquakes(limit=5):
         "starttime": start_time,
         "minmagnitude": 1,
     }
-    response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=20)
+    response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=API_TIMEOUT_SECONDS)
     top_events = []
 
     if response.status_code == 200:
@@ -130,7 +132,7 @@ def get_last_earthquake():
         "starttime": start_time,
         "minmagnitude": 1,
     }
-    response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=20)
+    response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=API_TIMEOUT_SECONDS)
     last_event = None
 
     if response.status_code == 200:

@@ -1,77 +1,91 @@
-![Screenshot of QuakeWatch](static/experts-logo.svg)
+![QuakeWatch logo](static/experts-logo.svg)
 
 # QuakeWatch
 
-**QuakeWatch** is a Flask-based web application designed to display real-time and historical earthquake data. It visualizes earthquake statistics with interactive graphs and provides detailed information sourced from the USGS Earthquake API. Built using an object‑oriented design and modular structure, QuakeWatch separates templates, utility functions, and route definitions, making it both scalable and maintainable. The application is also containerized with Docker for easy deployment.
+**QuakeWatch** is a Flask web application that shows real-time and historical earthquake data from the USGS Earthquake API, with graphs of earthquake counts over time. Templates, utility functions, and route definitions live in separate modules, and the app is containerized with Docker.
 
 ## Features
 
 - **Real-Time & Historical Data:** Fetches earthquake data from the USGS API.
-- **Interactive Graphs:** Displays earthquake counts over various time periods (e.g., last 30 days, 5-year view) using Matplotlib.
-- **Top Earthquake Events:** Shows the top 5 worldwide earthquakes (last 30 days) by magnitude.
+- **Graphs:** Shows earthquake counts over various time periods (last N days, 5-year view) using Matplotlib.
+- **Top Earthquake Events:** Shows the top 5 earthquakes worldwide (last 30 days) by magnitude.
 - **Recent Earthquake Details:** Highlights the most recent earthquake event.
-- **RESTful Endpoints:** Provides endpoints for health checks, status, connectivity tests, and raw data.
-- **Clean UI:** Built with Bootstrap 5, featuring a professional navigation bar with a logo.
-- **Dockerized:** Easily containerized for streamlined deployment.
+- **REST Endpoints:** Health checks, status, connectivity tests, and raw data.
+- **Clean UI:** Bootstrap 5 with a navigation bar and logo.
+- **Dockerized:** Runs under `gunicorn` as a non-root user.
+
+## Endpoints
+
+| Path | Description |
+|---|---|
+| `/` | Main page |
+| `/graph-earthquakes` | Graph dashboard (`?days=30&location=Japan`) |
+| `/graph-earthquakes.png` | Earthquake count graph image |
+| `/graph-earthquakes-5years.png` | 5-year graph image |
+| `/telaviv-earthquakes` | Raw JSON for Tel Aviv (last 30 days) |
+| `/health` | Health check (used by Kubernetes probes) |
+| `/ping` | Returns `pong` |
+| `/status` | Service status and uptime |
+| `/info` | Application metadata |
 
 ## Project Structure
 
-```
-QuakeWatch/
-├── app.py                  # Application factory and entry point
-├── dashboard.py            # Blueprint & route definitions using OOP style
-├── utils.py                # Helper functions and custom Jinja2 filters
-├── requirements.txt        # Python dependencies
+```text
+QuakeWatch-app/
+├── app.py                   # Application factory and entry point
+├── dashboard.py             # Blueprint & route definitions
+├── utils.py                 # USGS API helpers, graph generation, Jinja2 filter
+├── requirements.txt         # Pinned Python dependencies
+├── Dockerfile               # Container image (gunicorn, non-root)
+├── .dockerignore
 ├── static/
-│   └── experts-logo.svg    # Logo file used in the UI
-└── templates/              # Jinja2 HTML templates
-    ├── base.html           # Base template with common layout and navigation
-    ├── main_page.html      # Home page content
-    └── graph_dashboard.html# Dashboard view with graphs and earthquake details
+│   └── experts-logo.svg     # Logo used in the UI
+└── templates/               # Jinja2 HTML templates
+    ├── base.html            # Shared layout and navigation
+    ├── main_page.html       # Home page
+    └── graph_dashboard.html # Graphs and earthquake details
 ```
 
-## Installation
+## Configuration
 
-### Locally
+The app reads these optional environment variables (in Kubernetes they come from the Helm chart's ConfigMap):
 
-1. **Clone the Repository:**
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `5000` | Port to listen on |
+| `LOG_LEVEL` | `INFO` | Log level for application and access logs (written to stdout) |
+| `API_TIMEOUT_SECONDS` | `20` | Timeout for USGS API requests |
+| `APP_NAME` | `QuakeWatch` | Shown in `/status` and `/info` |
+| `APP_ENV` | `development` | Shown in `/status` |
+| `FLASK_DEBUG` | `0` | Set to `1` to enable debug mode (local `python app.py` only) |
 
-   ```bash
-   git clone https://github.com/yourusername/QuakeWatch.git
-   cd QuakeWatch
-   ```
+## Running Locally
 
-2. **Set Up a Virtual Environment (optional but recommended):**
+```bash
+git clone https://github.com/MichaelGoncharov0/QuakeWatch-repo.git
+cd QuakeWatch-repo/QuakeWatch-app
 
-   ```bash
-   python -m venv venv
-   source venv/bin/activate   # On Windows: venv\Scripts\activate
-   ```
+python3 -m venv .venv
+source .venv/bin/activate      # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 
-3. **Install Dependencies:**
+python app.py
+```
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Then open http://127.0.0.1:5000.
 
-## Running the Application Locally
+## Running with Docker
 
-1. **Start the Flask Application:**
-
-   ```bash
-   python app.py
-   ```
-
-2. **Access the Application:**
-
-   Open your browser and visit [http://127.0.0.1:5000](http://127.0.0.1:5000) to view the dashboard.
-
+```bash
+docker build -t quakewatch:1.0.0 .
+docker run --rm -p 5000:5000 quakewatch:1.0.0
+```
 
 ## Custom Jinja2 Filter
 
-The project includes a custom filter `timestamp_to_str` that converts epoch timestamps to human-readable strings. This filter is registered during application initialization and is used in the templates to format earthquake event times.
+The custom filter `timestamp_to_str` converts epoch timestamps (in milliseconds) to readable UTC strings. It is registered in `create_app()` and used in the templates to format earthquake event times.
 
-## Known Issues
+## Notes
 
-- **SSL Warning:** You might see a warning regarding LibreSSL when using urllib3. This is informational and does not affect the functionality of the application.
-- **Matplotlib Backend:** The application forces Matplotlib to use the `Agg` backend for headless rendering. Ensure this setting is applied before any Matplotlib imports to avoid GUI-related errors.
+- **Matplotlib backend:** The app uses the non-GUI `Agg` backend so graphs render on headless servers and containers.
+- **macOS SSL warning:** With the system Python on macOS, you may see a urllib3 warning about LibreSSL. It is informational and doesn't affect the app.
