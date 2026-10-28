@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'QuakeWatch-app/**'
+      - '.github/workflows/quakewatch-cd.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quakewatch-cd-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
@@ -26,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/quakewatch
+          images: michaelgoncharov0/quakewatch
           tags: |
             type=raw,value=latest
             type=sha,prefix=sha-
