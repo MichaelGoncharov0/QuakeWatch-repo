@@ -1,29 +1,40 @@
-from flask import Blueprint, render_template, jsonify, request, send_file, current_app
-from utils import generate_graph, get_top_earthquakes, get_last_earthquake, COUNTRIES
+"""Flask blueprint with the QuakeWatch dashboard routes."""
+
 from datetime import datetime, timedelta
+
 import requests
+from flask import Blueprint, render_template, jsonify, request, send_file, current_app
+
+from utils import generate_graph, get_top_earthquakes, get_last_earthquake, COUNTRIES
 
 dashboard_blueprint = Blueprint('dashboard', __name__)
 
+
 class EarthquakeDashboard:
+    """Groups the dashboard routes registered on dashboard_blueprint."""
+
     @staticmethod
     @dashboard_blueprint.route('/')
     def main_page():
+        """Render the main landing page."""
         return render_template('main_page.html')
 
     @staticmethod
     @dashboard_blueprint.route('/ping')
     def ping():
+        """Simple liveness check."""
         return 'pong', 200
 
     @staticmethod
     @dashboard_blueprint.route('/health')
     def health():
+        """Return application health status."""
         return jsonify(status='ok', message='Application is healthy'), 200
 
     @staticmethod
     @dashboard_blueprint.route('/status')
     def status():
+        """Return basic service status information."""
         status_info = {
             'service': 'Flask Application',
             'status': 'running',
@@ -34,6 +45,7 @@ class EarthquakeDashboard:
     @staticmethod
     @dashboard_blueprint.route('/info')
     def info():
+        """Return general application metadata."""
         app_info = {
             'name': 'Sample Flask App',
             'version': '1.0',
@@ -45,7 +57,7 @@ class EarthquakeDashboard:
     @staticmethod
     @dashboard_blueprint.route('/telaviv-earthquakes')
     def telaviv_earthquakes():
-        # Return raw Tel Aviv earthquake data (last 30 days)
+        """Return raw Tel Aviv earthquake data (last 30 days)."""
         start_time = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
         params = {
             'format': 'geojson',
@@ -55,7 +67,7 @@ class EarthquakeDashboard:
             'starttime': start_time
         }
         usgs_url = "https://earthquake.usgs.gov/fdsnws/event/1/query"
-        response = requests.get(usgs_url, params=params)
+        response = requests.get(usgs_url, params=params, timeout=20)
         if response.status_code == 200:
             data = response.json()
             processed_events = []
@@ -80,13 +92,14 @@ class EarthquakeDashboard:
                 'events': processed_events
             }
             return jsonify(result), 200
-        else:
-            current_app.logger.error("Error fetching data from USGS API")
-            return jsonify(error="Error fetching data from USGS API"), response.status_code
+
+        current_app.logger.error("Error fetching data from USGS API")
+        return jsonify(error="Error fetching data from USGS API"), response.status_code
 
     @staticmethod
     @dashboard_blueprint.route('/graph-earthquakes.png')
     def graph_earthquakes_image():
+        """Return a PNG graph of earthquakes for the selected location and days."""
         days = int(request.args.get('days', 30))
         loc_name = request.args.get('location', "Tel Aviv, Israel")
         location = COUNTRIES.get(loc_name, COUNTRIES["Tel Aviv, Israel"])
@@ -96,15 +109,23 @@ class EarthquakeDashboard:
     @staticmethod
     @dashboard_blueprint.route('/graph-earthquakes-5years.png')
     def graph_earthquakes_5years_image():
+        """Return a PNG graph of earthquakes over the last 5 years."""
         days = 5 * 365  # Approximate days in 5 years
         loc_name = request.args.get('location', "Tel Aviv, Israel")
         location = COUNTRIES.get(loc_name, COUNTRIES["Tel Aviv, Israel"])
-        img = generate_graph(days, location["lat"], location["lon"], location["radius"], title_suffix="(5 Years)")
+        img = generate_graph(
+            days,
+            location["lat"],
+            location["lon"],
+            location["radius"],
+            title_suffix="(5 Years)",
+        )
         return send_file(img, mimetype='image/png')
 
     @staticmethod
     @dashboard_blueprint.route('/graph-earthquakes')
     def graph_earthquakes_page():
+        """Render the graph dashboard page."""
         days = int(request.args.get('days', 30))
         loc_name = request.args.get('location', "Tel Aviv, Israel")
         top_events = get_top_earthquakes(limit=5)
