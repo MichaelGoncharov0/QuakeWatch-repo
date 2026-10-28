@@ -1,13 +1,31 @@
 """Flask blueprint with the QuakeWatch dashboard routes."""
 
+import os
 from datetime import datetime, timedelta
 
 import requests
 from flask import Blueprint, render_template, jsonify, request, send_file, current_app
 
-from utils import generate_graph, get_top_earthquakes, get_last_earthquake, COUNTRIES
+from utils import (
+    API_TIMEOUT_SECONDS,
+    COUNTRIES,
+    EARTHQUAKE_API_URL,
+    generate_graph,
+    get_last_earthquake,
+    get_top_earthquakes,
+)
 
 dashboard_blueprint = Blueprint('dashboard', __name__)
+
+START_TIME = datetime.utcnow()
+
+
+def _format_uptime():
+    """Return the process uptime as a human-readable string."""
+    total_seconds = int((datetime.utcnow() - START_TIME).total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours}h {minutes}m {seconds}s"
 
 
 class EarthquakeDashboard:
@@ -36,9 +54,10 @@ class EarthquakeDashboard:
     def status():
         """Return basic service status information."""
         status_info = {
-            'service': 'Flask Application',
+            'service': os.environ.get('APP_NAME', 'QuakeWatch'),
+            'environment': os.environ.get('APP_ENV', 'development'),
             'status': 'running',
-            'uptime': '72 hours'
+            'uptime': _format_uptime()
         }
         return jsonify(status_info), 200
 
@@ -47,10 +66,10 @@ class EarthquakeDashboard:
     def info():
         """Return general application metadata."""
         app_info = {
-            'name': 'Sample Flask App',
-            'version': '1.0',
-            'author': 'Your Name',
-            'description': 'A sample Flask application demonstrating multiple routes'
+            'name': os.environ.get('APP_NAME', 'QuakeWatch'),
+            'version': '1.0.0',
+            'author': 'Michael Goncharov',
+            'description': 'Earthquake dashboard powered by the USGS Earthquake API'
         }
         return jsonify(app_info), 200
 
@@ -66,8 +85,7 @@ class EarthquakeDashboard:
             'maxradiuskm': 100,
             'starttime': start_time
         }
-        usgs_url = "https://earthquake.usgs.gov/fdsnws/event/1/query"
-        response = requests.get(usgs_url, params=params, timeout=20)
+        response = requests.get(EARTHQUAKE_API_URL, params=params, timeout=API_TIMEOUT_SECONDS)
         if response.status_code == 200:
             data = response.json()
             processed_events = []

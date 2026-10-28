@@ -10,12 +10,18 @@ WORKDIR /app
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code
-COPY . .
+# Run as an unprivileged user (UID matches the Helm chart securityContext)
+RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin appuser
 
-# Ensure logs directory exists
-RUN mkdir -p /app/logs
+# Copy application source code
+COPY --chown=appuser:appuser . .
+
+USER 10001
+
+# Build the Matplotlib font cache at image build time instead of on every pod start
+RUN python -c "import matplotlib.pyplot"
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+# Production WSGI server instead of the Flask development server
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --timeout 60 --access-logfile - 'app:create_app()'"]
