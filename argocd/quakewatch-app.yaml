@@ -1,6 +1,6 @@
-# Argo CD Application: deploys quakewatch-chart from this repo's main branch.
+# Argo CD Applications: quakewatch-chart from this repo, plus the metrics-server add-on its HPA needs.
 # Bootstrap (after installing Argo CD into the argocd namespace):
-#   kubectl apply -f argocd/quakewatch-application.yaml
+#   kubectl apply -f argocd/quakewatch-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,3 +24,27 @@ spec:
       selfHeal: true  # revert manual changes made in the cluster
     syncOptions:
       - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: 3.14.0
+    helm:
+      valuesObject:
+        args:
+          # Docker Desktop's kubelet serves a self-signed cert; drop this on clusters with proper kubelet certs.
+          - --kubelet-insecure-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true     # delete resources that were removed from git
+      selfHeal: true  # revert manual changes made in the cluster
