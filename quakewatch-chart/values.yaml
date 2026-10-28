@@ -9,10 +9,11 @@ app:
 replicaCount: 4
 
 image:
-  repository: quakewatch
-  pullPolicy: IfNotPresent
-  # Defaults to the chart appVersion when empty.
-  tag: ""
+  repository: michaelgoncharov0/quakewatch
+  # This sets the pull policy for images.
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: latest
 
 imagePullSecrets: []
 nameOverride: ""
