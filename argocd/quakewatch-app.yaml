@@ -33,9 +33,10 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://kubernetes-sigs.github.io/metrics-server/
-    chart: metrics-server
-    targetRevision: 3.14.0
+    # Pulled from the git repo (not the kubernetes-sigs.github.io Helm repo) so it uses the same github.com trust path as the quakewatch app.
+    repoURL: https://github.com/kubernetes-sigs/metrics-server.git
+    path: charts/metrics-server
+    targetRevision: metrics-server-helm-chart-3.14.0
     helm:
       valuesObject:
         args:
