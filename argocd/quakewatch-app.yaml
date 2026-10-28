@@ -1,0 +1,26 @@
+# Argo CD Application: deploys quakewatch-chart from this repo's main branch.
+# Bootstrap (after installing Argo CD into the argocd namespace):
+#   kubectl apply -f argocd/quakewatch-application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quakewatch
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MichaelGoncharov0/QuakeWatch-repo.git
+    targetRevision: main
+    path: quakewatch-chart
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quakewatch
+  syncPolicy:
+    automated:
+      prune: true     # delete resources that were removed from git
+      selfHeal: true  # revert manual changes made in the cluster
+    syncOptions:
+      - CreateNamespace=true
